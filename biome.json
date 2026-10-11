@@ -1,63 +1,69 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
-	"vcs": {
-		"enabled": false,
-		"clientKind": "git",
-		"useIgnoreFile": false
-	},
-	"files": {
-		"ignoreUnknown": false,
-		"includes": [
-			"**",
-			"!**/src/**/*.css",
-			"!**/src/public/**/*",
-			"!**/dist/**/*",
-			"!**/node_modules/**/*"
-		]
-	},
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"formatter": {
-		"enabled": true,
-		"indentStyle": "tab"
+		"indentStyle": "tab",
+		"indentWidth": 2,
+		"lineWidth": 100,
+		"formatWithErrors": true,
+		"includes": ["**", "!**/*.astro"]
 	},
 	"assist": { "actions": { "source": { "organizeImports": "on" } } },
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
-			"style": {
-				"noParameterAssign": "error",
-				"useAsConstAssertion": "error",
-				"useDefaultParameterLast": "error",
-				"useEnumInitializers": "error",
-				"useSelfClosingElements": "error",
-				"useSingleVarDeclarator": "error",
-				"noUnusedTemplateLiteral": "error",
-				"useNumberNamespace": "error",
-				"noInferrableTypes": "error",
-				"noUselessElse": "error"
+			"preset": "recommended",
+			"a11y": {
+				"noSvgWithoutTitle": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "warn"
 			}
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	},
 	"javascript": {
 		"formatter": {
-			"quoteStyle": "double"
+			"trailingCommas": "all",
+			"semicolons": "always"
 		}
 	},
 	"overrides": [
 		{
-			"includes": ["**/*.svelte", "**/*.astro", "**/*.vue"],
+			"includes": ["**/*.astro"],
 			"linter": {
 				"rules": {
-					"style": {
-						"useConst": "off",
-						"useImportType": "off"
-					},
 					"correctness": {
-						"noUnusedVariables": "off",
-						"noUnusedImports": "off"
+						"noUnusedImports": "off",
+						"noUnusedVariables": "off"
 					}
 				}
 			}
+		},
+		{
+			"includes": ["src/styles/global.css"],
+			"linter": {
+				"rules": {
+					"complexity": { "noImportantStyles": "off" },
+					"style": { "noDescendingSpecificity": "off" }
+				}
+			}
+		},
+		{
+			"includes": ["public/giscus-*.css"],
+			"linter": {
+				"rules": {
+					"style": { "noDescendingSpecificity": "off" }
+				}
+			}
 		}
-	]
+	],
+	"vcs": {
+		"clientKind": "git",
+		"enabled": true,
+		"useIgnoreFile": true
+	}
 }

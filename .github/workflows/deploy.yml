@@ -1,38 +1,60 @@
 name: Deploy to GitHub Pages
 
 on:
-  # 每次推送到 main 分支时自动触发部署
   push:
-    branches: [ main ]
-  # 允许你在 GitHub 网站上点击按钮手动触发部署
+    branches: [main]
   workflow_dispatch:
 
-# 允许任务克隆代码仓库并创建一个页面部署
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Allow one concurrent deployment, skip runs queued behind in-progress ones.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your repository using git
-        uses: actions/checkout@v5
-        
-      - name: Install, build, and upload your site
-        uses: withastro/action@v5
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
         with:
-          # 💡 核心修改：显式指定使用 pnpm，因为 Fuwari 主题完美适配 pnpm
-          package-manager: pnpm@9.14.4
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Detects the base path ("/<repo>" or "/") and enables Pages.
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      # `pnpm build` runs `astro check && astro build`, then the
+      # `postbuild` script runs pagefind over dist/.
+      - run: pnpm build
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
 
   deploy:
+    name: Deploy
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - id: deployment
+        uses: actions/deploy-pages@v5
