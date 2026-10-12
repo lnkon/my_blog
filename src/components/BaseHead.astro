@@ -46,7 +46,20 @@ const goatcounter = analytics?.goatcounterUrl;
     }
 
 <link href={withBase("/manifest.webmanifest")} rel="manifest"/>
-<link data-font-locale={locale} href={fontStylesheet} rel="stylesheet"/>
+
+
+
+
+<!-- <link data-font-locale={locale} href={fontStylesheet} rel="stylesheet"/> -->
+<link
+  data-font-locale={locale}
+  href={fontStylesheet}
+  rel="stylesheet"
+  fetchpriority="high"
+/>
+
+
+
 
 <link href={canonicalURL} rel="canonical"/>
 {
