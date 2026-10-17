@@ -1,0 +1,295 @@
+---
+//默认布局，所有页面都必须套上这个布局，不然壁纸和导航栏功能不能正常工作
+import '../styles/global.css';
+import { site } from '../site.config';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import WallpaperPicker from '../components/WallpaperPicker.astro';
+
+const {
+  title,
+  ogType = 'website',
+  ogDescription = site.description,
+  jsonLd,
+} = Astro.props;
+const pageTitle = title ? `${title} — ${site.name}` : site.defaultTitle;
+// SEO 使用的站点域名（site.url 留空时用占位域名）
+const siteUrl = site.url || 'https://example.com';
+const currentPath = Astro.url.pathname;
+
+function navClass(href: string) {
+  const isActive = currentPath === href;
+  return isActive
+    ? 'text-accent bg-accent/10 font-medium'
+    : 'text-fg/60 hover:text-accent hover:bg-fg/5';
+}
+---
+ 
+
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+   
+    <meta name="description" content={ogDescription} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={ogDescription} />
+    <meta property="og:image" content={new URL(site.ogImage, siteUrl).href} />
+    <meta property="og:site_name" content={site.ogSiteName} />
+    <meta property="og:url" content={new URL(Astro.url.pathname, siteUrl).href} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={ogDescription} />
+    <meta name="twitter:image" content={new URL(site.ogImage, siteUrl).href} />
+    <link rel="canonical" href={new URL(Astro.url.pathname, siteUrl).href} />
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+   
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>{pageTitle}</title>
+
+  <script is:inline>
+  // 更改网页图标的配置代码在这里，默认使用favicon.png名字和格式图片， <link rel="icon" type="image/png" href="/favicon.png" />
+ 
+ 
+  // ===== 第一层：首屏防闪（FOUC）=====
+  // 必须在 head 里同步执行，在浏览器画第一帧之前设好主题
+  (function () {
+    var stored = localStorage.getItem('theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+
+  // ===== 第二层：ClientRouter 切页防闪 =====
+  // ClientRouter 导航后不重跑 inline 脚本，
+  // 必须监听 astro:after-swap 事件，在新页面渲染前重新设主题
+  function applyTheme() {
+    var stored = localStorage.getItem('theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  document.addEventListener('astro:after-swap', applyTheme);
+  </script>
+
+  <!-- ===== 最底层画布底色（防白闪）=====
+       html 背景决定浏览器 canvas 的颜色。body 为了露出壁纸图层会被设成透明，
+       此时如果 html 也没有背景色，canvas 就回落成默认白 ——
+       翻页、首帧、切壁纸的任何一瞬间都会闪白。
+       这里在 head 里同步写死主题底色，跟 global.css 里的 --c-bg 保持一致。 -->
+  <style is:inline>
+    html { background-color: #fafafa; }
+    html[data-theme="dark"] { background-color: #0f0f12; }
+  </style>
+  </head>
+
+  <body class="bg-bg text-fg min-h-screen flex flex-col">
+    <!-- 液态玻璃位移滤镜：只被 CSS 的 backdrop-filter 引用，自身不参与布局 -->
+    <svg class="liquid-glass-svg" aria-hidden="true" focusable="false">
+      <defs>
+        <!-- 滤镜区域比元素本身放大一圈，给位移留出取样空间，避免边缘出现透明锯齿 -->
+        <filter
+          id="liquid-glass"
+          x="-20%"
+          y="-20%"
+          width="140%"
+          height="140%"
+          filterUnits="objectBoundingBox"
+          color-interpolation-filters="sRGB"
+        >
+          <!-- 横向拉伸的噪声（baseFrequency 两个值不同）→ 更像水面的横向波纹 -->
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.006 0.012"
+            numOctaves="2"
+            seed="7"
+            result="noise"
+          />
+          <feGaussianBlur in="noise" stdDeviation="1.6" result="soft" />
+          <!-- 用噪声的 R/G 通道分别偏移像素的 X/Y，产生折射扭曲 -->
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="soft"
+            scale="56"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+    </svg>
+
+    <!-- Chromium 首屏不会为 backdrop-filter 引用的 SVG 滤镜建立合成，
+         导致第一次打开页面时液态玻璃不生效、刷新一次（资源已缓存）才出现。
+         这里在加载完成后主动触发一次重新合成，强制它立刻生效。 -->
+    <script is:inline>
+      (function () {
+        function wake() {
+          var el = document.querySelector('.liquid-glass');
+          if (!el) return;
+          // 摘掉再装回滤镜声明，迫使 Chromium 重建 backdrop 合成层
+          el.style.backdropFilter = 'none';
+          el.style.setProperty('-webkit-backdrop-filter', 'none');
+          void el.offsetWidth; // 强制样式重算（不会插入绘制帧，因此不会闪）
+          el.style.backdropFilter = '';
+          el.style.removeProperty('-webkit-backdrop-filter');
+        }
+        window.addEventListener('load', function () {
+          // 铺开几个时间点：壁纸图片解码、淡入动画结束都可能晚于 load，
+          // 每个点各唤醒一次，确保最终一定合成出来
+          wake();
+          setTimeout(wake, 400);
+          setTimeout(wake, 1000);
+          setTimeout(wake, 2000);
+        });
+        document.addEventListener('astro:page-load', wake);
+      })();
+    </script>
+
+    <!-- 全宽导航条：logo 在最左，导航+主题/壁纸在最右，中间留空 -->
+    <header class="sticky top-4 z-50 px-4 md:px-6">
+      <div class="liquid-glass flex items-center justify-between w-full px-20 py-4
+                  text-lg
+                  max-md:gap-3 max-md:px-4 max-md:py-2 max-md:text-sm">
+        <a href="/" class:list={['px-3 py-1.5 max-md:px-2.5 max-md:py-1 rounded-full transition-all duration-200', navClass('/')]}>{site.name}</a>
+
+        <!-- 右侧：桌面导航 + 主题/壁纸（整体靠右） -->
+        <div class="flex items-center gap-1">
+          <!-- 桌面导航（md 及以上横排显示，仅导航链接） -->
+          <nav class="hidden md:flex items-center gap-1">
+            {site.nav.map((item) => (
+              <a href={item.href} class:list={['px-3 py-1.5 rounded-full transition-all duration-200', navClass(item.href)]}>{item.label}</a>
+            ))}
+          </nav>
+          <ThemeToggle />
+          <WallpaperPicker />
+          <!-- 汉堡按钮：仅手机显示 -->
+          <button
+            id="menu-btn"
+            class="md:hidden p-1.5 rounded-full hover:bg-fg/10 transition-colors"
+            aria-label="打开菜单"
+            aria-expanded="false"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 手机端下拉菜单：放在 header 外，避免毛玻璃 backdrop-filter 影响 fixed 定位 -->
+    <div
+      id="mobile-menu"
+      class="md:hidden fixed top-24 right-4 z-[60] w-56
+             bg-bg/85 backdrop-blur-xl
+             rounded-2xl shadow-xl shadow-black/10
+             ring-1 ring-fg/10
+             scale-95 opacity-0 pointer-events-none
+             transition-all duration-200 ease-out
+             flex flex-col p-2"
+    >
+      {site.nav.map((item) => (
+        <a
+          href={item.href}
+          class:list={['px-3 py-2.5 rounded-xl text-sm transition-colors', navClass(item.href)]}
+        >
+          {item.label}
+        </a>
+      ))}
+    </div>
+
+    <!-- slot 是"页面内容插入的洞"：layout 提供外壳，页面的内容填进这里 -->
+    <main class="flex-1">
+      <slot />
+    </main>
+    <footer class="px-8 py-6 border-t border-fg/10 text-sm opacity-60">
+      {site.name}
+    </footer>
+
+  <script>
+    // ===== 手机端汉堡菜单（事件委托 + 动态查询，ClientRouter 切页后依然有效） =====
+    let menuOpen = false;
+
+    function getMenu() {
+      return document.getElementById('mobile-menu');
+    }
+
+    function setMenu(open: boolean) {
+      menuOpen = open;
+      const menu = getMenu();
+      if (!menu) return;
+      menu.classList.toggle('opacity-0', !open);
+      menu.classList.toggle('scale-95', !open);
+      menu.classList.toggle('pointer-events-none', !open);
+      menu.classList.toggle('opacity-100', open);
+      menu.classList.toggle('scale-100', open);
+      const btn = document.getElementById('menu-btn');
+      if (btn) btn.setAttribute('aria-expanded', String(open));
+    }
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      // 点汉堡按钮：切换开合
+      if (target?.closest('#menu-btn')) {
+        setMenu(!menuOpen);
+        return;
+      }
+      // 点菜单里的链接：关闭
+      if (target?.closest('#mobile-menu a')) {
+        setMenu(false);
+        return;
+      }
+      // 点外部空白：关闭
+      if (menuOpen && !target?.closest('#mobile-menu')) {
+        setMenu(false);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menuOpen) setMenu(false);
+    });
+  </script>
+
+  <!-- 液态玻璃样式必须用 is:inline 原样输出。
+       否则构建时的 Lightning CSS 会把手写的 backdrop-filter 删掉、只保留 -webkit- 前缀，
+       而 Chrome 的 -webkit-backdrop-filter 别名不支持 url() 滤镜引用 —— 折射效果就会消失。 -->
+  <style is:inline>
+    /* SVG 滤镜容器：不能占布局空间，否则会挤开页面 */
+    .liquid-glass-svg {
+      position: absolute;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    /* ── 液态玻璃导航栏 ── */
+    .liquid-glass {
+      /* 玻璃本体：半透明底色 + 发光描边 + 内高光，做出“一块玻璃”的厚度感 */
+      background: color-mix(in srgb, var(--c-bg) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c-fg) 10%, transparent);
+      border-radius: 1rem;
+      box-shadow:
+        inset 1px 1px 1px color-mix(in srgb, #ffffff 45%, transparent),
+        inset -1px -1px 1px color-mix(in srgb, #ffffff 12%, transparent),
+        inset 0 0 24px color-mix(in srgb, var(--c-fg) 4%, transparent),
+        0 8px 32px color-mix(in srgb, #000000 12%, transparent);
+
+      /* 降级方案：不支持滤镜引用时的普通毛玻璃（Safari / Firefox） */
+      backdrop-filter: blur(16px) saturate(120%);
+      -webkit-backdrop-filter: blur(16px) saturate(120%);
+    }
+
+    /* 支持在 backdrop-filter 里引用 SVG 滤镜的浏览器（Chromium）：追加水下折射波纹 */
+    @supports (backdrop-filter: url(#liquid-glass)) {
+      .liquid-glass {
+        /* 先位移扭曲，再轻微模糊，模拟玻璃折射（饱和度克制一点，避免颜色发艳） */
+        backdrop-filter: url(#liquid-glass) blur(3px) saturate(115%);
+        -webkit-backdrop-filter: url(#liquid-glass) blur(3px) saturate(115%);
+      }
+    }
+  </style>
+
+  </body>
+</html>

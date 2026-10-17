@@ -1,93 +1,92 @@
-import type { SiteConfig } from "@/types";
-import type { AstroExpressiveCodeOptions } from "astro-expressive-code";
+// ── 全局站点配置 ──
+// fork 后只需改这个文件，整个站点自动更新
 
-export const siteConfig: SiteConfig = {
-	author: "Eliay",
-	date: {
-		locale: "en-US",
-		options: {
-			day: "numeric",
-			month: "short",
-			year: "numeric",
-		},
-	},
-	description:
-		"Every line is about you.",
-	lang: "en-US",
-	ogLocale: "en_US",
-	sortPostsByUpdatedDate: false,
-	title: "Eliay's blog",
-	hideThemeCredit: false,
-	profile: {
-		name: "Eliay",
-		email: "linkong0604@gmail.com",
-		github: "https://github.com/lnkon",
-		// twitter: "https://x.com/example",
-		// jobTitle: "Software Engineer",
-		// employer: "Example Inc.",
-		// employerUrl: "https://example.com",
-		// alumni: "Example University",
-		// avatar: "/avatar.png",
-	},
-	// Uncomment & fill in to enable Giscus comments on every post.
-	// comments: {
-	// 	repo: "your-handle/your-repo",
-	// 	repoId: "...",
-	// 	category: "General",
-	// 	categoryId: "...",
-	// },
-	// Uncomment to enable analytics. Both providers load via Partytown.
-	// analytics: {
-	// 	googleAnalyticsId: "G-XXXXXXX",
-	// 	goatcounterUrl: "https://your-handle.goatcounter.com/count",
-	// },
-};
+export const site = {
+  // 网站名称（导航栏 logo、页脚、页面标题后缀、SEO）
+  name: 'リンコン',
 
-export const menuLinks: { path: string; title: string }[] = [
-	{
-		path: "/",
-		title: "Home",
-	},
-	{
-		path: "/posts/",
-		title: "Posts",
-	},
-	{
-		path: "/showcase/",
-		title: "Showcase",
-	},
-	{
-		path: "/about/",
-		title: "About",
-	},
-];
+  // 默认页面标题（未指定 title 时的后备值）
+  defaultTitle: '我的博客',
 
-export const expressiveCodeOptions: AstroExpressiveCodeOptions = {
-	styleOverrides: {
-		borderRadius: "4px",
-		codeBackground: ({ theme }) => (theme.type === "light" ? "#f0e9d6" : "#151517"),
-		codeFontFamily: "var(--font-mono)",
-		codeFontSize: "clamp(0.8125rem, 0.75rem + 0.25vw, 0.875rem)",
-		codeLineHeight: "1.7142857rem",
-		codePaddingInline: "1rem",
-		frames: {
-			editorActiveTabBackground: ({ theme }) => (theme.type === "light" ? "#f0e9d6" : "#151517"),
-			editorTabBarBackground: ({ theme }) => (theme.type === "light" ? "#ebe3cd" : "#0b0b0c"),
-			frameBoxShadowCssValue: "none",
-			terminalBackground: ({ theme }) => (theme.type === "light" ? "#f0e9d6" : "#151517"),
-			terminalTitlebarBackground: ({ theme }) => (theme.type === "light" ? "#ebe3cd" : "#0b0b0c"),
-		},
-		uiFontFamily: "var(--font-mono)",
-		uiLineHeight: "inherit",
-	},
-	themeCssSelector(theme, { styleVariants }) {
-		if (styleVariants.length >= 2) {
-			const baseTheme = styleVariants[0]?.theme;
-			const altTheme = styleVariants.find((v) => v.theme.type !== baseTheme?.type)?.theme;
-			if (theme === baseTheme || theme === altTheme) return `[data-theme='${theme.type}']`;
-		}
-		return `[data-theme="${theme.name}"]`;
-	},
-	themes: ["min-dark", "min-light"],
-	useThemedScrollbars: false,
+  // SEO 站点描述（meta description）
+  description: '不定期鱿鱼。',
+
+  // ── SEO：分享与链接 ──
+  url: 'https://linkong.online',            // 站点域名（必须带 https://，SEO/canonical/sitemap 依赖它）
+  ogImage: 'https://weavatar.com/api/avatar/b8eda6edae6fe35aac1515b4577ebf11b3e359752248b3c1b673ff2d9b878ead?s=144&t=1792032536205',                           // 社交分享预览图（public/og.png，建议 1200×630）
+  ogSiteName: '我的博客',                      // 分享卡片上显示的站点名
+
+  // 作者信息
+  author: {
+    name: 'LINKONG',
+    github: 'https://github.com/lnkon',
+    // 关于页头像：填 public/ 下的路径（如 '/avatar.png'）或完整图片 URL
+    // 留空则自动使用 GitHub 头像 https://github.com/<github>.png
+    avatar: 'https://weavatar.com/api/avatar/b8eda6edae6fe35aac1515b4577ebf11b3e359752248b3c1b673ff2d9b878ead?s=144&t=1792032536205',
+  },
+
+  // 关于页面的介绍文字
+  about: '鱿鱼,每天都在鱿鱼。',
+
+  // ── 首页左侧「公告栏」──
+  // 一行一条，按数组顺序显示；留空数组则不显示公告栏
+  notices: [
+    '一个随便记录一点东西的地方',
+    '喜欢小猫。',
+  ],
+
+  // ── 首页右侧「记录栏」的最后更新时间数据源 ──
+  // 填 '用户名/仓库名'（如 'ruijieking/New-blog-v3'）→ 构建时读取该仓库最后一次提交时间
+  // 留空 或 读取失败 → 自动降级用本地 git 提交时间
+  // 再取不到 → 降级用最新一篇文章的发布日期
+  statsRepo: '',
+
+  // ── 社交链接（显示在「关于我」页头像卡片右侧，自左向右排列）──
+  // icon 可选：github / bilibili / mail / telegram / twitter / rss
+  //          填其它值会显示通用链接图标
+  // href 支持 https:// 链接或 mailto: 邮箱
+  // 不想显示某一项，直接把那一行删掉即可
+  socials: [
+    { label: 'GitHub',   href: 'https://github.com/lnkon',      icon: 'github' },
+    { label: 'Bilibili', href: 'https://space.bilibili.com/1069258889',  icon: 'bilibili' },
+    { label: 'mail',  href: 'mailto:linkong0604@gmail.com',              icon: 'mail' },
+  ],
+
+  // ── 友情链接 ──
+  // 每个字段含义：
+  //   name        站点名称（必填）
+  //   url         站点地址（必填，带 https://）
+  //   description 一句话简介（可选）
+  //   avatar      头像图片地址（可选，留空则用站点名首字自动生成圆形占位）
+  // 数组留空 → 友链页会显示「还没有友链」的占位文案
+  friends: [
+
+    // {
+    //   name: 'ruijieking',
+    //   url: 'https://ruijieking.github.io/',
+    //   description: '我的个人博客，记录 Linux、终端配置、Neovim 和摄影相关的内容。',
+    //   avatar: 'https://github.com/ruijieking.png'
+    // },
+
+    // {
+    //   name: 'Astro',
+    //   url: 'https://astro.build',
+    //   description: '本站使用的静态站点框架，内容优先、默认零 JS。',
+    //   avatar: 'https://astro.build/favicon.svg',
+    // },
+  ],
+
+  // 友链页「申请友链」卡片的说明文字（留空则用默认文案）
+  friendApplyNote:
+    '欢迎交换友链～ 请先在你的站点加上本站链接，然后通过下面的任一方式把「名称 / 链接 / 头像 / 简介」发给我。',
+
+  // 导航栏（href + 显示文字，数组顺序即显示顺序）
+  nav: [
+    { href: '/talk', label: '今日说法' },
+    { href: '/blog', label: '文章' },
+    { href: '/archive', label: '归档' },
+    { href: '/photo', label: '照片' },
+    { href: '/friends', label: '友链' },
+    { href: '/about', label: '关于我' },
+  ],
 };

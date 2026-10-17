@@ -1,0 +1,399 @@
+---
+// 壁纸选择器组件
+// 图片放在 src/assets/wallpaper/{light,dark}/ 下，构建时由 astro:assets 自动优化
+import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+// import.meta.glob 动态导入所有壁纸（构建时静态分析，目录新增图片会自动包含）
+const wallpaperModules = import.meta.glob(
+  '/src/assets/wallpaper/**/*.{jpg,jpeg,png,webp,gif}',
+  { eager: true },
+) as Record<string, { default: ImageMetadata }>;
+
+interface WallpaperItem {
+  thumb: string; // 240px webp 缩略图（网格显示）
+  src: string;   // 1920px webp 大图（壁纸背景）
+  name: string;  // 文件名（用于识别默认壁纸）
+}
+
+const lightImages: WallpaperItem[] = [];
+const darkImages: WallpaperItem[] = [];
+
+for (const [path, mod] of Object.entries(wallpaperModules)) {
+  const img = mod?.default;
+  if (!img) continue;
+  const isDark = path.includes('/dark/');
+  try {
+    const full = await getImage({ src: img, width: 1920, format: 'webp' });
+    const thumb = await getImage({ src: img, width: 240, format: 'webp' });
+    const item: WallpaperItem = { thumb: thumb.src, src: full.src, name: path.split('/').pop() ?? '' };
+    if (isDark) darkImages.push(item);
+    else lightImages.push(item);
+  } catch {
+    // 跳过无法优化的图片
+  }
+}
+
+lightImages.sort((a, b) => a.name.localeCompare(b.name));
+darkImages.sort((a, b) => a.name.localeCompare(b.name));
+
+// 默认壁纸：优先找"默认light/dark"命名的图，找不到用第一张
+function defaultWallpaper(theme: 'light' | 'dark'): string | null {
+  const list = theme === 'dark' ? darkImages : lightImages;
+  return list.find((w) => w.name.includes('默认'))?.src ?? list[0]?.src ?? null;
+}
+const defaultLight = defaultWallpaper('light');
+const defaultDark = defaultWallpaper('dark');
+---
+
+<button
+  id="wallpaper-btn"
+  class="p-1.5 rounded-full hover:bg-fg/10 transition-colors relative"
+  aria-label="选择壁纸"
+  title="壁纸"
+>
+  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+</button>
+
+<!-- 下拉卡片（隐藏态） -->
+<div
+  id="wallpaper-card"
+  class="fixed top-16 right-4 z-[60] w-72 max-h-[60vh]
+         bg-bg/85 backdrop-blur-xl
+         rounded-2xl shadow-xl shadow-black/10
+         ring-1 ring-fg/10
+         scale-95 opacity-0 pointer-events-none
+         transition-all duration-200 ease-out
+         overflow-hidden flex flex-col"
+>
+  <!-- 卡片头部 -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-fg/10 shrink-0">
+    <span class="text-sm font-medium">壁纸</span>
+    <div class="flex items-center gap-1">
+      <span id="wallpaper-count" class="text-xs text-fg/40"></span>
+      <button id="wallpaper-close" class="p-1 rounded-full hover:bg-fg/10 transition-colors" aria-label="关闭">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 壁纸网格（补全渲染：eager + sync） -->
+  <div id="wallpaper-grid" class="grid grid-cols-3 gap-2 p-3 overflow-y-auto flex-1">
+    <!-- JS 动态填充 -->
+  </div>
+
+  <!-- 清除壁纸按钮 -->
+  <div class="px-3 pb-3 pt-1 shrink-0">
+    <button id="wallpaper-clear"
+      class="w-full py-1.5 text-xs text-fg/40 hover:text-accent hover:bg-accent/5 rounded-lg transition-colors">
+      清除壁纸
+    </button>
+  </div>
+</div>
+
+<script define:vars={{ lightImages, darkImages, defaultLight, defaultDark }}>
+  // ===== 补全渲染壁纸选择器 =====
+  // lightImages / darkImages 由 Astro 服务端注入
+
+  const btn = document.getElementById('wallpaper-btn');
+  const card = document.getElementById('wallpaper-card');
+  const grid = document.getElementById('wallpaper-grid');
+  const closeBtn = document.getElementById('wallpaper-close');
+  const clearBtn = document.getElementById('wallpaper-clear');
+  const countEl = document.getElementById('wallpaper-count');
+
+  // 把壁纸卡片挂到 body 下，脱离导航栏的 overflow-x-auto 和毛玻璃(backdrop-filter)
+  // 包含块影响——否则 fixed 定位会失效，卡片会被困在导航栏里点不开
+  document.body.appendChild(card);
+
+  let isOpen = false;
+
+  function getTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  }
+
+  function getImages() {
+    return getTheme() === 'dark' ? darkImages : lightImages;
+  }
+
+  function getStorageKey() {
+    return `wallpaper-${getTheme()}`;
+  }
+
+  // ===== 双图层壁纸系统 =====
+  // layerA（上层，z-index -1）：专门负责「淡入」新壁纸
+  // layerB（下层，z-index -2）：始终不透明的底片，全程托底 → 画面不会透光、不会闪
+  //
+  // 为什么不直接交叉淡化（上层淡出 + 下层淡入）？
+  // 两层同时处于半透明时，叠加后的总不透明度会掉到 75% 左右，
+  // 中间那 25% 会露出页面底色（body 透明后就是浏览器白底），看起来就是「闪一下」。
+  const layerA = document.createElement('div');
+  const layerB = document.createElement('div');
+
+  [layerA, layerB].forEach((layer, i) => {
+    layer.id = `wp-layer-${i === 0 ? 'a' : 'b'}`;
+    layer.style.cssText = `
+      position: fixed; inset: 0; z-index: ${i === 0 ? -1 : -2};
+      background-size: cover; background-position: center;
+      transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      /* 自带主题底色打底：图片还没解码完也不会露出白底 */
+      background-color: var(--c-bg);
+      opacity: 0;
+    `;
+    document.body.prepend(layer);
+  });
+
+  // 【防止闪白的关键】
+  // 壁纸图层需要 body 背景透明才能露出来，而 body 一旦透明，
+  // 浏览器会把最底层画布（html/canvas）回落成默认的白色 ——
+  // 只要有任何一帧图层没完全盖住视口，看到的就是一片刺眼的白。
+  // 所以直接给 html 指定主题底色：canvas 永远是有颜色的，白色不可能再出现。
+  document.documentElement.style.backgroundColor = 'var(--c-bg)';
+
+  let currentSrc = null;         // 当前已经稳定显示的壁纸路径
+  let pendingSrc = null;         // 正在加载的目标壁纸（用于丢弃过期请求）
+  let fadeTimer = null;          // 淡入结束后的收尾定时器
+  let cleanupTimer = null;       // 上层淡出结束后清图的定时器
+
+  // 瞬间（无过渡）把一个图层铺好，用于首屏和动画收尾
+  function setInstant(layer, src) {
+    layer.style.transition = 'none';
+    layer.style.backgroundImage = `url("${src}")`;
+    layer.style.opacity = '1';
+    layer.offsetHeight; // 强制回流，让浏览器立刻采用新样式
+    requestAnimationFrame(() => { layer.style.transition = ''; });
+  }
+
+  // 预加载壁纸：等图片真正下载 + 解码完成后，再开始切换动画。
+  // 否则旧壁纸已经淡出、新图还没到，中间会出现一整片空白（夜里看非常刺眼）。
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        // decode() 让解码在进入合成前完成，淡入时不会掉帧
+        if (typeof img.decode === 'function') {
+          img.decode().then(() => resolve(src), () => resolve(src));
+        } else {
+          resolve(src);
+        }
+      };
+      img.onerror = () => reject(new Error(`壁纸加载失败：${src}`));
+      img.src = src;
+    });
+  }
+
+  // 应用壁纸（带动画）
+  function applyWallpaper(src) {
+    // 清除壁纸：两层一起淡出，露出页面自身的主题底色
+    if (!src) {
+      pendingSrc = null;
+      currentSrc = null;
+      if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+      if (cleanupTimer) { clearTimeout(cleanupTimer); cleanupTimer = null; }
+      layerA.style.transition = '';
+      layerB.style.transition = '';
+      document.body.style.backgroundColor = '';
+      layerA.style.opacity = '0';
+      layerB.style.opacity = '0';
+      return;
+    }
+
+    // 同一张壁纸不重复切换
+    if (src === currentSrc) return;
+
+    // 首次加载（也包括每次翻页后的恢复）：同步铺到下层，绝不能带过渡动画。
+    // 否则每次跳转壁纸都要从透明淡入 0.6s，视觉上就是「闪一下」。
+    // 图层自带主题底色，所以图片没解码完也不会露白。
+    if (!currentSrc) {
+      currentSrc = src;
+      pendingSrc = null;
+      document.body.style.backgroundColor = 'transparent';
+      setInstant(layerB, src);
+      layerA.style.opacity = '0';
+      layerA.style.backgroundImage = '';
+      return;
+    }
+
+    pendingSrc = src;
+
+    // 先等新图下载 + 解码完成，再开始动画。
+    // 否则旧壁纸已经没了、新图还没到，中间会出现一整片空白（夜里看非常刺眼）。
+    loadImage(src)
+      .then(() => {
+        // 加载期间用户又切了别的壁纸 → 丢弃这次的结果
+        if (pendingSrc !== src) return;
+        pendingSrc = null;
+
+        if (fadeTimer) clearTimeout(fadeTimer);
+        if (cleanupTimer) clearTimeout(cleanupTimer);
+
+        // 核心：新壁纸放在「上层」淡入，下层的旧壁纸始终保持 100% 不透明。
+        // 这样全程总不透明度恒为 1，不会出现交叉淡化中途透光的闪烁。
+        document.body.style.backgroundColor = 'transparent';
+        layerA.style.backgroundImage = `url("${src}")`;
+        layerA.offsetHeight; // 强制回流，确保新背景图已注册
+        layerA.style.opacity = '1';
+        currentSrc = src;
+
+        fadeTimer = setTimeout(() => {
+          fadeTimer = null;
+          // 淡入完成：把同一张图补到下层（URL 已在缓存且已解码，瞬时完成）
+          setInstant(layerB, src);
+          // 下层已经就位，此时上层淡出画面完全不变
+          layerA.style.opacity = '0';
+          cleanupTimer = setTimeout(() => {
+            cleanupTimer = null;
+            layerA.style.backgroundImage = '';
+          }, 700);
+        }, 650);
+      })
+      .catch(() => {
+        // 加载失败：保持当前壁纸不动，绝不切成空白
+        if (pendingSrc === src) pendingSrc = null;
+      });
+  }
+
+  function selectWallpaper(src) {
+    const key = getStorageKey();
+    localStorage.setItem(key, src);
+    applyWallpaper(src);
+    closeCard();
+    highlightSelected();
+  }
+
+  function clearWallpaper() {
+    const key = getStorageKey();
+    // 用特殊值 'none' 记录清除状态，切页/换主题后也能保持清除
+    localStorage.setItem(key, 'none');
+    applyWallpaper(null);
+    highlightSelected();
+  }
+
+  function highlightSelected() {
+    const key = getStorageKey();
+    const current = localStorage.getItem(key);
+    grid.querySelectorAll('button').forEach(b => {
+      const src = b.getAttribute('data-src');
+      if (src === current) {
+        b.classList.add('ring-2', 'ring-accent', 'ring-offset-1', 'ring-offset-bg');
+      } else {
+        b.classList.remove('ring-2', 'ring-accent', 'ring-offset-1', 'ring-offset-bg');
+      }
+    });
+  }
+
+  // 渲染壁纸网格：缩略图用优化后的小图（thumb），懒加载；选中/应用用原图（src）
+  function renderGrid() {
+    const images = getImages();
+    countEl.textContent = `${images.length} 张`;
+
+    grid.innerHTML = images.map(item => `
+      <button
+        class="aspect-square rounded-lg overflow-hidden
+               hover:scale-105 active:scale-95
+               transition-transform duration-150
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        data-src="${item.src}"
+        aria-label="选择壁纸"
+      >
+        <img
+          src="${item.thumb}"
+          alt="壁纸"
+          loading="lazy"
+          decoding="async"
+          class="w-full h-full object-cover"
+        />
+      </button>
+    `).join('');
+
+    grid.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => {
+        const src = b.getAttribute('data-src');
+        selectWallpaper(src);
+      });
+    });
+
+    highlightSelected();
+  }
+
+  function openCard() {
+    isOpen = true;
+    renderGrid();
+    card.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+    card.classList.add('opacity-100', 'scale-100');
+  }
+
+  function closeCard() {
+    isOpen = false;
+    card.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+    card.classList.remove('opacity-100', 'scale-100');
+  }
+
+  function toggleCard() {
+    isOpen ? closeCard() : openCard();
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCard();
+  });
+
+  closeBtn.addEventListener('click', () => closeCard());
+
+  clearBtn.addEventListener('click', () => clearWallpaper());
+
+  document.addEventListener('click', (e) => {
+    if (isOpen && !card.contains(e.target) && e.target !== btn) {
+      closeCard();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen) {
+      closeCard();
+    }
+  });
+
+  // 监听主题切换（ThemeToggle 发出的自定义事件，比 MutationObserver 更可靠）
+  document.addEventListener('themechange', () => {
+    restoreWallpaper();
+    if (isOpen) renderGrid();
+  });
+
+  // 兜底：监听 data-theme 属性变化（处理非 ThemeToggle 触发的情况）
+  const observer = new MutationObserver(() => {
+    restoreWallpaper();
+    if (isOpen) renderGrid();
+  });
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+
+  // ClientRouter 切页后恢复壁纸
+  document.addEventListener('astro:after-swap', restoreWallpaper);
+
+  function restoreWallpaper() {
+    const key = getStorageKey();
+    let saved = localStorage.getItem(key);
+    if (saved === 'none') {
+      // 用户主动清除了壁纸：切页/换主题后保持清除状态
+      applyWallpaper(null);
+      return;
+    }
+    if (!saved) {
+      // 首次访问：使用默认壁纸（astro:assets 优化后的 URL）
+      const theme = getTheme();
+      saved = theme === 'dark' ? (defaultDark ?? '') : (defaultLight ?? '');
+      if (saved) localStorage.setItem(key, saved);
+    }
+    applyWallpaper(saved);
+  }
+
+  restoreWallpaper();
+</script>

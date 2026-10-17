@@ -1,206 +1,326 @@
-# Astro Kami
+# Astro 博客模板
 
-An internationalised Astro blog template with editorial typography, light and dark themes, Markdown/MDX, RSS, OG
-images, and optional Giscus comments and analytics.
+一个现代、高颜值的个人博客模板，基于 **Astro** 与 **Tailwind CSS** 构建 —— 全静态、默认零客户端 JavaScript。主页、归档、相册、今日说法、友链、关于页全部开箱即用，只需要改一个配置文件就能完成个性化定制。
 
-**Live demo:** [GitHub Pages](https://automann.github.io/astro-kami)
+构建产物输出在 `dist/` 文件夹内。
 
-## Features
+[![Astro](screenshots/astro-7.1.svg)](https://astro.build)
+[![Tailwind CSS](screenshots/tailwindcss-4.svg)](https://tailwindcss.com)
+[![License](screenshots/license-mit.svg)](LICENSE)
+[![Node.js](screenshots/node-22.svg)](https://nodejs.org)
 
-- Astro 7 static output with content collections (posts and pages, both validated by Zod)
-- English at the unprefixed root and Simplified Chinese under `/zh/`, with locale-aware navigation, dates, archives,
-  tags, Showcase, RSS, sitemap entries, and `hreflang` metadata
-- MDX support — embed Astro/JSX components, imports, and JS expressions inside posts
-- Light and dark themes that follow the system preference and persist the reader's choice
-- Bundled variable Newsreader and Inter fonts, plus Unicode-range
-  [Maple Mono CN](https://github.com/subframe7536/maple-font) for code and Chinese glyph coverage
-- Language-specific typography tokens so English and Chinese can share layout structure without sharing every
-  typesetting decision
-- Code blocks via [astro-expressive-code](https://expressive-code.com): themes, copy button, terminal frames, line
-  highlighting
-- Math via KaTeX (`$inline$` and `$$display$$`)
-- Custom containers (`:::note`, `:::tip`, `:::important`, `:::caution`, `:::warning`)
-- Paginated post archives (20 posts per page) and per-locale tag indexes
-- A localized Showcase with priority-based ordering, three featured projects on the home page, and a complete listing
-- Per-post OG images generated at build time (Satori + resvg)
-- Per-locale RSS feeds, an internationalized sitemap, robots.txt, and a web manifest
-- A Pagefind full-text index generated after each production build
-- Optional [Giscus](https://giscus.app) comments with custom matched themes
-- Optional GA4 and Goatcounter analytics, both loaded via [Partytown](https://partytown.qwik.dev/) so they run on a
-  worker thread
-- Optional [webmentions](https://webmention.io), fetched at build and cached locally
-- Static HTML with no client-side framework or internationalization runtime
+> **简体中文** | [English](./README.en.md)
 
-## Quick start
+> 🌐 在线演示：<https://ruijieking.github.io>
 
-Click **Use this template** on GitHub, or clone directly:
+## 📸 预览
 
-```sh
-git clone https://github.com/automann/astro-kami.git
-cd astro-kami
-pnpm install
-pnpm dev
+![首页](screenshots/3.png)
+
+## ✨ 功能特性
+
+- 🏠 **完整首页** —— 自动汇总最新的「今日说法 / 文章 / 照片」三块内容，无需手动维护
+- 📢 **公告栏** —— 首页左侧悬浮侧栏，内容在配置里一行一条
+- 📊 **记录栏** —— 自动统计文章数、说说数、照片数、总字数，并读取仓库最后一次更新时间
+- 🖼️ **文章封面图** —— frontmatter 加一行 `cover` 即可，列表卡片左侧自动显示
+- 👤 **关于页** —— 头像卡片 + 社交链接（GitHub / B 站 / 邮箱…，内置 SVG 图标）+ 简介卡片
+- 🔗 **友链页** —— 配置里加一行就多一个友链；头像外链失效会自动降级成站名首字占位，另带「申请友链」信息卡片与一键复制
+- 🧊 **液态玻璃导航栏** —— 用 SVG 位移滤镜做出水下折射波纹（Chromium 生效），其它浏览器自动降级为普通毛玻璃
+- 🌗 **明暗主题切换** —— 防首屏闪烁（FOUC），自动记忆你的选择
+- 🖼️ **壁纸系统** —— 明暗主题各配一套壁纸，切换时先预加载再淡入（下层始终不透明），不闪白、不露底；按主题分别记忆
+- 📝 **博客文章** —— 基于 Astro content collections（标题、描述、日期、分类、标签、封面）
+- 📚 **归档时间轴** —— 按年份分组，支持**即时搜索**和**多标签过滤**
+- 💬 **今日说法** —— 轻量级碎碎念 / 短笔记板块
+- 📷 **照片相册** —— 文件夹即相册，三层叠加封面 + **灯箱（Lightbox）** 大图查看
+- 📑 **文章目录** —— 从文章标题自动生成，点击平滑滚动
+- 🔍 **完整 SEO** —— Open Graph、Twitter Cards、canonical 链接、JSON-LD 结构化数据
+- 📡 **RSS 订阅**、**sitemap**、**robots.txt**
+- ✨ 滚动入场动画 + 磨砂玻璃卡片设计
+- 📱 完全响应式，移动端汉堡菜单
+- ⚡ **图片自动优化**（`astro:assets` + `sharp`，输出 WebP）
+- 🚀 **一键部署**到 GitHub Pages（GitHub Actions 自动构建）
+
+## 🏠 首页结构
+
+```
+英雄区（站名 + 描述，水平居中）
+├── 左侧栏（≥1280px 才显示，吸附在导航栏下方；窄屏与手机直接隐藏）
+│   ├── 公告栏 —— 内容来自 site.config.ts 的 notices
+│   └── 记录栏 —— 文章数 / 说说数 / 照片数 / 总字数 / 仓库最后更新时间
+└── 主内容（始终水平居中，宽度固定 720px）
+    ├── 今日说法   → 取最新 2 条
+    ├── 最新文章   → 取最新 3 篇
+    └── 最新照片   → 取最新相册的前 3 张
 ```
 
-Open http://localhost:4321.
+> 记录栏的「最后更新」在**构建时**读取 `statsRepo` 指定的 GitHub 仓库提交时间（走 Atom feed，免认证、无限流）。读取失败会自动降级为本地 git 提交时间，再降级为最新文章的发布日期，**任何一级失败都不会让构建挂掉**。把 `statsRepo` 留空则这一项不显示，其它统计照常。
 
-## Commands
+## 📸 截图
 
-| Command        | What it does                                                      |
-| -------------- | ----------------------------------------------------------------- |
-| `pnpm dev`     | Start the development server with HMR                             |
-| `pnpm check`   | Run Astro and TypeScript diagnostics                              |
-| `pnpm build`   | Type-check, build, compress assets, and generate Pagefind indexes |
-| `pnpm test`    | Build with a project base path and run the integration tests      |
-| `pnpm preview` | Preview the production build locally                              |
-| `pnpm lint`    | Lint with Biome; warnings fail the command                        |
-| `pnpm format`  | Format with Biome and Prettier                                    |
+| 文章详情 | 关于我 | 照片 |
+| --- | --- | --- |
+| ![文章详情](screenshots/post.png) | ![关于我](screenshots/1.png) | ![照片](screenshots/2.png) |
 
-## Configuration
+## 🚀 快速开始
 
-Most site-wide personalisation happens in the following files.
+### 环境要求
 
-- **`src/site.config.ts`** holds the site title and description, author profile, menu, sorting preference, comments,
-  analytics, webmentions, and Expressive Code options. Optional profile links such as `email`, `github`, `twitter`,
-  `linkedin`, and `mastodon` are only rendered when configured. Optional employment, education, and avatar fields feed
-  the About page and structured data.
-- **`src/i18n/config.ts`** defines locales, URL prefixes, locale metadata, and interface strings.
-- **`src/data/showcase.ts`** contains localized project descriptions, badges, and priorities. Higher priorities appear
-  first; the home page displays the top three entries.
+- **Node.js** >= 22.12.0
+- npm（或 pnpm / yarn）
 
-**`astro.config.ts`** is where you set `site` to your final domain (used for canonical URLs, sitemap, RSS, and OG image
-URLs). The base path is handled automatically — see [Deploying](#deploying); you normally don't touch it.
+### 1. 安装依赖
 
-Replace or add these assets in `public/`:
+```bash
+npm install
+```
 
-- `icon.png` (512×512). Drives the favicon and the auto-generated `apple-touch-icon`, `icon-192`, and `icon-512` PWA
-  manifest icons.
-- `social-card.png` (1200×630). Fallback OG image, used when a post doesn't have its own. The default is a placeholder
-  you can swap.
-- `avatar.png` (optional; add it yourself). Referenced from `siteConfig.profile.avatar`, used in the About page's
-  structured data and any avatar slot you add. Remove the configured path when no avatar is available.
+### 2. 本地开发
 
-### Per-post OG images
+启动开发服务器，访问 <http://localhost:4321>：
 
-Every post gets its own 1200×630 OG image generated at build time by [Satori](https://github.com/vercel/satori). English
-cards use Newsreader and Maple Mono; Chinese cards load the complete Maple Mono CN Regular font during the build so
-their titles, descriptions, and metadata render without missing glyphs. Long titles, descriptions, and tag lists are
-bounded to remain inside the fixed card layout. The complete CN font is not copied into the deployed site.
-The card model and markup live in `src/components/og/article-card.ts`; the route in
-`src/pages/og-image/[...slug].png.ts` supplies article data and build-time font profiles. Tweak the component once and
-every post's card updates on the next build. To skip the generated image and point a post at your own, set
-`ogImage: "/path/to/image.png"` in the post's frontmatter.
+```bash
+npm run dev
+```
 
-## Writing posts
+### 3. 构建与预览
 
-Posts live in `src/content/post/` as `.md` or `.mdx` files. The filename becomes the public slug, excluding a locale
-directory such as `zh/`.
+```bash
+npm run build     # 输出到 dist/
+npm run preview   # 预览生产构建
+```
 
-English is the unprefixed default locale. Put Simplified Chinese posts in `src/content/post/zh/`; they are published
-under `/zh/posts/`, while default-locale posts remain under `/posts/`. Locale routing and interface strings live in
-`src/i18n/config.ts`.
+## 🎨 个性化配置
+
+站点所有个性化配置都在**一个文件**里：`src/site.config.ts`。改一次，全站自动更新。
+
+```ts
+export const site = {
+  // 网站名称（导航栏 logo、页脚、页面标题后缀、SEO）
+  name: '我的博客',
+  defaultTitle: '我的博客',
+  description: '写代码、拍照片、记录生活。',
+
+  // SEO：站点域名（必须带 https://，canonical / sitemap / robots.txt 依赖它）⭐⭐⭐
+  url: 'https://example.com',
+  ogImage: '/og.png',                  // 社交分享图（public/ 下，建议 1200×630）
+  ogSiteName: '我的博客',               // 分享卡片上显示的站点名
+
+  // 作者信息
+  author: {
+    name: '你的名字',
+    github: 'your-github-username',
+    // 关于页头像：填 public/ 下的路径（如 '/avatar.png'）或完整图片 URL
+    // 留空则自动使用 GitHub 头像 https://github.com/<github>.png
+    avatar: '',
+  },
+
+  // 关于页面的介绍文字
+  about: '这是我的个人博客，用 Astro 构建。',
+
+  // ── 首页左侧「公告栏」──
+  // 一行一条，按数组顺序显示；留空数组则不显示公告栏
+  notices: [
+    '欢迎来到我的博客 👋',
+    '这里会记录一些随手写的东西。',
+  ],
+
+  // ── 首页「记录栏」最后更新的数据源 ──
+  // 填 '用户名/仓库名'（如 'ruijieking/New-blog-v3'）→ 构建时读取该仓库最后一次提交时间
+  // 留空 或 读取失败 → 降级用本地 git 提交时间，再取不到则用最新文章日期
+  statsRepo: '',
+
+  // ── 关于页社交链接（自左向右排列）──
+  // icon 可选：github / bilibili / mail / telegram / twitter / rss（其它值显示通用图标）
+  // href 支持 https:// 或 mailto:；不想显示某一项就删掉那一行
+  socials: [
+    { label: 'GitHub',   href: 'https://github.com/your-name',       icon: 'github' },
+    { label: 'Bilibili', href: 'https://space.bilibili.com/你的UID',  icon: 'bilibili' },
+    { label: 'QQ 邮箱',  href: 'mailto:你的QQ号@qq.com',              icon: 'mail' },
+  ],
+
+  // ── 友链页 ──
+  // name / url 必填，description / avatar 可选；
+  // avatar 留空（或外链失效）会自动用站名首字生成圆形占位，不会出现裂图。
+  // 数组留空 → 友链页显示「还没有添加友链」的引导文案
+  friends: [
+    {
+      name: '某某的博客',
+      url: 'https://example.com',
+      description: '前端 / 摄影 / 折腾 Linux',
+      avatar: 'https://example.com/avatar.png',
+    },
+  ],
+
+  // 友链页「申请友链」卡片的说明文字（留空则用默认文案）
+  friendApplyNote:
+    '欢迎交换友链～ 请先在你的站点加上本站链接，然后把「名称 / 链接 / 头像 / 简介」发给我。',
+
+  // 导航栏（href + 显示文字，数组顺序即显示顺序）
+  nav: [
+    { href: '/talk', label: '今日说法' },
+    { href: '/blog', label: '文章' },
+    { href: '/archive', label: '归档' },
+    { href: '/photo', label: '照片' },
+    { href: '/friends', label: '友链' },
+    { href: '/about', label: '关于我' },
+  ],
+};
+```
+
+## 📝 添加内容
+
+### 博客文章
+
+在 `src/content/blog/` 下新建 Markdown 文件：
+
+```md
+---
+title: '你好，世界'           # 必填
+description: '我的第一篇文章' # 必填
+pubDate: '2026-01-01'         # 必填   
+category: '生活'              # 可选
+tags: ['astro', '博客']       # 可选
+cover: '/covers/我的封面.png' # 可选，列表卡片的封面图（图片放 public/covers/ 下）
+coverAlt: '一张终端截图'       # 可选，封面图 alt，不写则用文章标题
+---
+
+正文内容…
+```
+
+### 文章封面图
+
+把图片放进 `public/covers/`，然后在 frontmatter 里加一行即可。推荐 **1200 × 675（16:9）**，其它比例会被 `object-cover` 裁切：
 
 ```yaml
+cover: '/covers/我的封面.png'
+coverAlt: '一张终端截图'
+```
+
+不写 `cover` 的文章，列表里会显示一个文档图标占位，不影响排版。
+
+### 今日说法
+
+在 `src/content/talk/` 下新建 Markdown 文件：
+
+```md
 ---
-title: "Your post title"
-publishDate: 2026-01-12
-description: "One-sentence summary used in cards, social previews, and meta tags."
-tags: [tag-one, tag-two]
-# updatedDate: 2026-02-01     # optional, shown as "Updated …"
-# draft: true                  # excludes the post from production builds
-# coverImage:
-#   src: ./_assets/cover.png
-#   alt: "Description for screen readers"
+update: '2026-01-01-12:00'
 ---
+
+短句内容…
 ```
 
-About pages are Markdown documents at `src/content/page/about.md` and `src/content/page/zh/about.md`. Showcase entries
-are typed objects in `src/data/showcase.ts`; empty the array and the Showcase tab is hidden automatically.
+### 照片相册
 
-## Project layout
+在 `src/assets/album/` 下新建文件夹 —— **每个文件夹就是一个相册，文件夹名字就是照片的名字**，里面的图片自动展示：
 
 ```
-src/
-  site.config.ts          # site, profile, menu, integrations, code-block theme
-  content.config.ts       # collection schemas (post, page)
-  content/
-    post/*.{md,mdx}       # default-locale blog posts
-    post/zh/              # Simplified Chinese blog posts
-    page/about.md         # default-locale About page
-    page/zh/about.md      # Simplified Chinese About page
-  data/
-    post.ts               # post queries, locale filtering, sorting, and tags
-    showcase.ts           # localized Showcase entries and priority helpers
-  i18n/config.ts          # locales, paths, locale metadata, and interface strings
-  components/
-    blog/                 # post lists, sharing, and webmentions
-    layout/               # header and footer
-    og/                   # locale-aware article social-card model and markup
-    pages/                # shared locale-aware page implementations
-    showcase/             # Showcase presentation components
-  layouts/                # Base.astro and BlogPost.astro
-  pages/                  # default-locale and /zh/ route adapters, OG images, RSS
-  plugins/                # Markdown/HTML processing plugins
-  styles/
-    fonts/                # locale-specific browser font loading
-    global.css            # colour, surface, layout, and shared component styles
-    typography/           # matching en.css and zh.css typography-token adapters
-tests/                    # built-output i18n/SEO and typography-contract tests
-public/                   # static assets and Giscus theme styles
+src/assets/album/
+├── 旅行/          ← 相册：「旅行」
+│   ├── photo1.jpg
+│   └── photo2.png
+└── 日常/
+    └── photo3.jpg
 ```
 
-## Theming
+### 壁纸
 
-Shared colour, surface, and layout tokens live in `src/styles/global.css`. Locale-specific font loading lives under
-`src/styles/fonts/`; font-family and type values live in `src/styles/typography/en.css` and
-`src/styles/typography/zh.css`, which both implement the same token interface. Light
-and dark palettes are selected through `[data-theme="light"]` and `[data-theme="dark"]` on `<html>`. A small inline
-script applies the saved or system theme before rendering to avoid a flash, and the header control persists changes in
-`localStorage`.
+把壁纸放到 `src/assets/wallpaper/` 下：
 
-Code-block themes are configured separately in `expressiveCodeOptions` in `site.config.ts` (defaults: `min-light` and
-`min-dark`).
+```
+src/assets/wallpaper/
+├── light/         ← 浅色主题显示的壁纸
+└── dark/          ← 深色主题显示的壁纸
+```
 
-## Deploying
+命名为 `默认light.png` / `默认dark.png` 的文件（或每个文件夹里的第一张图）会被用作默认壁纸。
 
-Output is a static `dist/` directory that deploys anywhere serving files: Cloudflare Pages, Netlify, Vercel, GitHub
-Pages, S3 + CloudFront. Build command: `pnpm build`. Output directory: `dist`.
+### 友链
 
-### Base path
+改 `src/site.config.ts` 里的 `friends` 数组就行，加一条多一个友链（不用动页面代码）：
 
-Defaults to root (`/`) — no config needed for local dev, Netlify, Vercel, Cloudflare Pages, a custom domain, or a
-GitHub Pages **user** site. The whole site (links, assets, feeds, OG/canonical, manifest, Markdown links) is base-aware.
+```ts
+friends: [
+  {
+    name: '某某的博客',                        // 站点名称（必填）
+    url: 'https://example.com',               // 站点地址（必填，带 https://）
+    description: '前端 / 摄影 / 折腾 Linux',    // 一句话简介（可选）
+    avatar: 'https://example.com/avatar.png', // 头像地址（可选）
+  },
+],
+```
 
-For a GitHub Pages **project** site (served from `/repo/`), the bundled `.github/workflows/deploy.yml` detects the
-subpath and configures it automatically; the only manual step is **Settings → Pages → Source: GitHub Actions**. For a
-subpath on any other host, build with `BASE_PATH=/sub pnpm build`.
+- 不写 `avatar` 会自动用站名首字生成圆形占位；外链失效（图被删 / 被墙）也会自动降级，不会出现裂图。
+- 「申请友链」卡片的说明文字改 `friendApplyNote`；卡片右侧会自动列出 `socials` 里的邮箱联系方式。
+- `friends` 留空数组时，友链页显示「还没有添加友链」的引导文案。
 
-### Asset caching
+## 🗂️ 项目结构
 
-Astro emits content-hashed CSS, JavaScript, and font filenames that are safe to cache for a long time. GitHub Pages,
-however, controls its own response headers and currently serves these assets with a short cache lifetime that the
-site cannot override. This is fine for the bundled demo, but production sites prioritising repeat-visit performance
-should use a host or CDN that supports a policy such as `Cache-Control: public, max-age=31536000, immutable` for
-paths ending in `/_astro/*` (including project subpaths such as `/astro-kami/_astro/*`), while keeping HTML on a
-shorter lifetime.
+```
+├── public/
+│   ├── covers/             # 文章封面图（frontmatter 里用 '/covers/xx.png' 引用）
+│   ├── favicon.*
+│   └── og.png              # 社交分享图
+├── src/
+│   ├── assets/
+│   │   ├── album/          # 照片相册（文件夹 = 相册）
+│   │   └── wallpaper/      # 主题壁纸（light/ dark/）
+│   ├── components/         # UI 组件
+│   │   ├── NoticeBoard.astro    # 首页公告栏
+│   │   ├── SiteStats.astro      # 首页记录栏（文章/照片/字数/最后更新）
+│   │   ├── Post.astro           # 文章列表卡片（含封面图）
+│   │   ├── ReadFrostedGlass.astro  # 文章磨砂玻璃容器
+│   │   ├── AlbumCard.astro      # 相册卡片
+│   │   ├── Archive.astro        # 归档时间轴
+│   │   ├── TalkList.astro       # 今日说法列表
+│   │   ├── Icon.astro           # 内置 SVG 图标（无图标库依赖）
+│   │   ├── AnimateIn.astro      # 入场动画包装
+│   │   ├── ThemeToggle.astro    # 明暗主题切换
+│   │   └── WallpaperPicker.astro
+│   ├── content/
+│   │   ├── blog/           # 博客文章（.md）
+│   │   └── talk/           # 今日说法（.md）
+│   ├── layouts/            # BaseLayout（主题、壁纸、SEO、导航栏、液态玻璃滤镜）
+│   ├── pages/              # 页面路由（首页 / 文章 / 归档 / 照片 / 今日说法 / 友链 / 关于 / 404 / RSS）
+│   ├── styles/global.css   # Tailwind 入口 + 主题色变量
+│   ├── content.config.ts   # 内容集合 schema
+│   └── site.config.ts      # ⭐ 全局站点配置
+├── astro.config.mjs
+├── package.json
+└── tsconfig.json
+```
 
-## Roadmap
+## 🚢 部署
 
-The next development priorities are:
+### GitHub Pages（不做后端非常推荐，因为部署简单免费）
 
-1. **Partial done** — Maple Mono stylesheets are isolated by locale and required weight. Further changes to the
-   Chinese splitting strategy are deferred because reducing request count also increases content-dependent glyph
-   transfer, making the expected real-world benefit too small and unstable to justify the added complexity.
-2. Add a first-class `translationKey` to the post schema, enabling article-level language switching and accurate
-   `hreflang` relationships between translations.
-3. Split `BlogPost.astro` into smaller, focused modules as a longer-term maintainability improvement; this should not
-   block the current visual-system work.
+项目自带的 `.github/workflows/deploy.yml` 会在每次 push 到 `main` 时自动构建并部署：
 
-## Credits
+1. 把这个模板推送到一个 GitHub 仓库；
+2. 打开 **Settings → Pages**，把 Source 设置为 **GitHub Actions**；
+3. 完成 —— 之后每次 push 到 `main` 都会自动重新构建并部署。
 
-Originally forked from [astro-sienna](https://github.com/anjay-goel/astro-sienna)
-by [Anjay Goel](https://github.com/anjay-goel), then heavily revamped into its current form.
+### 其他平台
 
-## License
+这是一个纯静态站点 —— 执行 `npm run build` 后把 `dist/` 文件夹部署到任意托管平台即可：
 
-[MIT](./LICENSE).
+- **Netlify**：构建命令 `npm run build`，发布目录 `dist`
+- **Vercel**：框架预设选择 **Astro**
+- **Cloudflare Pages**：构建命令 `npm run build`，输出目录 `dist`
+
+> 💡 记得在 `src/site.config.ts` 里把 `site.url` 设为你的线上域名，canonical、sitemap、robots.txt 才会正确生成。
+
+## 🛠️ 技术栈
+
+| 工具 | 用途 |
+|---|---|
+| [Astro](https://astro.build) 7 | 静态站点框架 |
+| [Tailwind CSS](https://tailwindcss.com) 4 | 样式（`@tailwindcss/vite`） |
+| [@tailwindcss/typography](https://github.com/tailwindlabs/tailwindcss-typography) | 文章排版 |
+| [astro:assets](https://docs.astro.build/en/guides/images/) + [sharp](https://sharp.pixelplumbing.com) | 图片优化 |
+| [@astrojs/sitemap](https://docs.astro.build/en/guides/integrations-guide/sitemap/) | 站点地图 |
+| [@astrojs/rss](https://docs.astro.build/en/guides/rss/) | RSS 订阅源 |
+
+## 📄 许可证
+
+[MIT](./LICENSE) © 2026 ruijieking
