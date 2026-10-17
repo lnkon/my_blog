@@ -14,7 +14,7 @@ export const site = {
   // ── SEO：分享与链接 ──
   url: 'https://linkong.online',            // 站点域名（必须带 https://，SEO/canonical/sitemap 依赖它）
   ogImage: 'https://weavatar.com/api/avatar/b8eda6edae6fe35aac1515b4577ebf11b3e359752248b3c1b673ff2d9b878ead?s=144&t=1792032536205',                           // 社交分享预览图（public/og.png，建议 1200×630）
-  ogSiteName: '我的博客',                      // 分享卡片上显示的站点名
+  ogSiteName: '博客',                      // 分享卡片上显示的站点名
 
   // 作者信息
   author: {
